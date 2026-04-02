@@ -22,6 +22,20 @@ Supports both **Ollama (local models)** and **API-based models** (Claude and Ope
 
 ---
 
+## Installing
+
+Run the following command in your terminal:
+
+```bash 
+git clone https://github.com/Brobuiltathing/ZentraAI.git
+```
+### Pip Installations
+```bash 
+pip install discord.py requests psutil google-auth google-auth-oauthlib google-api-python-client
+```
+
+---
+
 ## Integration Modes
 
 ### 1. Ollama + Discord
@@ -101,7 +115,9 @@ Click **Save Changes**.
 On the **Bot** tab, click **Reset Token** and copy the token shown.  
 Paste this token into the config field in the program.
 
-``` DISCORD_BOT_TOKEN = "#########################################" ```
+```bash 
+DISCORD_BOT_TOKEN = "#########################################" 
+```
 
  ^^This line looks like this^^
 
