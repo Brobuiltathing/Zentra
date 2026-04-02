@@ -99,14 +99,17 @@ Click **Save Changes**.
 
 ### 3. Get Your Bot Token
 On the **Bot** tab, click **Reset Token** and copy the token shown.  
-Paste this token into the config field in the program.  
+Paste this token into the config field in the program.
+
+``` DISCORD_BOT_TOKEN = "#########################################" ```
+ ^^This line looks like this^^
+ 
 > ⚠️ Never share or commit your bot token — treat it like a password.
 
 ### 4. Invite the Bot to Your Server
 1. Go to the **OAuth2 → URL Generator** tab
 2. Under **Scopes**, select `bot`
 3. Under **Bot Permissions**, select:
-   - `Read Messages / View Channels`
    - `Send Messages`
    - `Read Message History`
 4. Copy the generated URL, paste it into your browser, and select your server to invite the bot
