@@ -48,6 +48,7 @@ try:
 except ImportError:
     PYAUTOGUI_AVAILABLE = False
 
+
 if platform.system() == "Windows":
     try:
         import winreg
@@ -59,12 +60,12 @@ else:
 
 
 
-DISCORD_BOT_TOKEN  = "##################################################################"
+
+DISCORD_BOT_TOKEN  = "##########################################################"
 
 OLLAMA_ENDPOINT    = "http://localhost:11434"
 OLLAMA_MODEL       = "qwen2.5-coder:7b"
 OLLAMA_TEMPERATURE = 0.1
-
 
 OLLAMA_VISION_MODEL = "llava:13b"
 
@@ -74,25 +75,19 @@ MEMORY_DEPTH = 8
 
 RUN_TIMEOUT_SECONDS = 30
 
-ALLOWED_USER_IDS: list = [#########################################]
-
+ALLOWED_USER_IDS: list = [#########################]
 
 MEMORY_FILE = os.path.join(os.getcwd(), "zentra_memory.json")
 
-
 SEEN_EMAILS_FILE = os.path.join(os.getcwd(), "zentra_seen_emails.json")
 
-
 READ_FILE_MAX_CHARS = 12_000
-
 
 SCREENSHOT_FOLDER = os.path.join(os.getcwd(), "zentra_screenshots")
 
 MAX_SCREEN_ACTIONS = 20
 
-
 SCREEN_ACTION_DELAY = 0.4
-
 
 GOOGLE_CREDENTIALS_FILE = os.path.join(os.getcwd(), "credentials.json")
 GOOGLE_TOKEN_FILE       = os.path.join(os.getcwd(), "google_token.pickle")
@@ -114,7 +109,6 @@ IMPORTANT_KEYWORDS = [
     "2fa", "two-factor", "verification", "account locked",
 ]
 IMPORTANT_SENDERS: list[str] = []
-
 
 LANG_RUNNER: dict = {
     ".py":  [sys.executable],
@@ -184,12 +178,13 @@ def _load_seen_emails() -> None:
 
 def _persist_seen_emails() -> None:
     try:
-
         ids = list(_seen_email_ids)[-2000:]
         with open(SEEN_EMAILS_FILE, "w") as fh:
             json.dump(ids, fh)
     except Exception as exc:
         log.warning(f"Could not persist seen emails: {exc}")
+
+
 
 
 SYSTEM_PROMPT = """You are ZENTRA, an AI developer assistant running locally on the user's PC.
@@ -214,6 +209,8 @@ You have access to these actions:
   calendar_add     — add a calendar event from natural language (put full request in 'reply')
   calendar_delete  — delete a calendar event (put title/time in 'reply')
   calendar_search  — search calendar events by keyword (put keyword in 'app' field)
+  shutdown_bot     — gracefully shut down the ZENTRA bot process
+  shutdown_pc      — shut down, restart, or sleep the host computer (put mode in 'app': shutdown/restart/sleep/cancel)
   chat             — plain conversational reply (no file or system action needed)
 
 ALWAYS return exactly this JSON shape — every field present, no extras, no omissions:
@@ -235,7 +232,7 @@ ALWAYS return exactly this JSON shape — every field present, no extras, no omi
 }
 
 Field rules:
-  action          — one of the eighteen actions listed above
+  action          — one of the twenty actions listed above
   filename        — full filename WITH correct extension (e.g. server.js, styles.css, main.go)
                     for read_file and edit_file: path relative to base files dir, or absolute
   folder          — optional subfolder inside the base files directory, else ""
@@ -248,17 +245,14 @@ Field rules:
                     for close_app: name or PID of the app to close (e.g. "chrome", "notepad", "1234")
                     for gmail_summary: optional filter keyword/sender (or "" for all unread)
                     for calendar_search: the keyword to search for
+                    for shutdown_pc: the mode — "shutdown", "restart", "sleep", or "cancel"
   app_path        — for open_app: full executable path if known, else ""
                     for close_app: full executable name if known (e.g. "chrome.exe"), else ""
   run_args        — for run_file: list of extra CLI arguments, else []
   git_folder      — for github_push: path to the git repo folder, else ""
   git_message     — for github_push: commit message string, else ""
   screen_goal     — for screen_action: a clear description of what you want to achieve on screen
-                    e.g. "Open the Start menu and search for Notepad"
-                    e.g. "Click the red X button to close the dialog"
-                    e.g. "Type 'Hello World' in the text field and press Enter"
   screen_actions  — for screen_action: optional list of pre-planned actions to execute
-                    Each action: {"type": "...", ...params...}
                     Leave as [] to let ZENTRA auto-plan from the screenshot
                     Action types and params:
                       {"type": "click",       "x": 500, "y": 300}
@@ -266,17 +260,19 @@ Field rules:
                       {"type": "right_click", "x": 500, "y": 300}
                       {"type": "move",        "x": 500, "y": 300}
                       {"type": "drag",        "x1": 100, "y1": 100, "x2": 400, "y2": 400}
-                      {"type": "scroll",      "x": 500, "y": 300, "clicks": 3}  (positive=up)
+                      {"type": "scroll",      "x": 500, "y": 300, "clicks": 3}
                       {"type": "type",        "text": "Hello World"}
-                      {"type": "key",         "key": "enter"}  (any pyautogui key name)
+                      {"type": "key",         "key": "enter"}
                       {"type": "hotkey",      "keys": ["ctrl", "c"]}
-                      {"type": "screenshot"}  (take mid-action screenshot for verification)
+                      {"type": "screenshot"}
                       {"type": "wait",        "seconds": 1.0}
                       {"type": "find_and_click", "image": "button_name", "description": "the OK button"}
   reply           — short friendly message (ALWAYS required, never empty)
                     for calendar_add: the full natural language event description goes here
                     for calendar_delete: the event title and/or time to delete
                     for gmail_send: recipient, subject, and body (full details)
+                    for shutdown_bot: farewell message to send before exiting
+                    for shutdown_pc: confirmation message describing what will happen
 
 Behaviour rules:
   - Use conversation history to understand follow-up requests
@@ -286,12 +282,13 @@ Behaviour rules:
   - For edit_file, each patch "old" value must be unique text within the file
   - For scaffold_project, think through the full file structure first, then populate every file completely
   - For close_app, use the most common process name (e.g. "chrome" → looks for "chrome.exe" / "chrome")
-  - For screen_action, describe the goal clearly; ZENTRA will take a screenshot, analyse it with vision
-    AI, then execute the appropriate actions automatically
+  - For screen_action, describe the goal clearly; ZENTRA will take a screenshot, analyse it with vision AI, then execute the appropriate actions automatically
   - For gmail_summary, use the app field for any filter the user mentioned (sender name, keyword, etc.)
   - For gmail_send, put all details (to, subject, body) in the reply field
   - For calendar_add/delete, put the complete original request in the reply field
   - For system_stats, no extra fields needed — just set action and reply
+  - For shutdown_bot, no extra fields needed — ZENTRA will save memory and exit gracefully
+  - For shutdown_pc, set app to "shutdown", "restart", "sleep", or "cancel"
   - For chat, set all fields except action and reply to "" or [] or {}
   - Write complete, idiomatic, working code — no TODOs or placeholders
   - NEVER output any text outside the JSON object
@@ -327,10 +324,6 @@ def save_to_memory(user_id: int, user_msg: str, bot_reply_summary: str) -> None:
 
 
 def _query_ollama_sync(prompt: str) -> str:
-    """
-    Streaming Ollama call — reads chunks as they arrive so the connection
-    never times out even for very long code generation.
-    """
     payload = {
         "model":      OLLAMA_MODEL,
         "stream":     True,
@@ -386,7 +379,6 @@ def _query_ollama_sync(prompt: str) -> str:
 
 
 def _ollama_raw_sync(system: str, user: str, max_tokens: int = 300) -> str:
-    """Lighter Ollama call for summarisation / classification — no JSON schema."""
     payload = {
         "model":      OLLAMA_MODEL,
         "stream":     False,
@@ -407,10 +399,6 @@ def _ollama_raw_sync(system: str, user: str, max_tokens: int = 300) -> str:
 
 
 def _ollama_vision_sync(image_b64: str, prompt: str, max_tokens: int = 1000) -> str:
-    """
-    Call the vision-capable Ollama model with a base64 image.
-    Returns the model's description / action plan.
-    """
     payload = {
         "model":      OLLAMA_VISION_MODEL,
         "stream":     False,
@@ -439,6 +427,7 @@ def _ollama_vision_sync(image_b64: str, prompt: str, max_tokens: int = 1000) -> 
 
 async def query_ollama(prompt: str) -> str:
     return await asyncio.to_thread(_query_ollama_sync, prompt)
+
 
 def extract_json(raw_text: str) -> dict:
     cleaned = re.sub(r"<think>[\s\S]*?</think>", "", raw_text, flags=re.IGNORECASE).strip()
@@ -507,6 +496,8 @@ def write_file(file_path: Path, content: str):
         return None
     except OSError as exc:
         return f"❌ Could not write `{file_path}`: {exc}"
+
+
 
 
 def handle_create_file(data: dict) -> str:
@@ -618,7 +609,6 @@ def handle_run_file(data: dict) -> str:
 
 
 def handle_read_file(data: dict) -> tuple[str, str]:
-    """Returns (discord_message, file_content_for_prompt)."""
     filename = data.get("filename", "").strip()
     if not filename:
         return "❌ read_file: no filename provided.", ""
@@ -755,8 +745,9 @@ def handle_scaffold_project(data: dict) -> str:
     return summary
 
 
+
+
 def _fmt_bytes(n: float) -> str:
-    """Human-readable byte count."""
     for unit in ("B", "KB", "MB", "GB", "TB"):
         if abs(n) < 1024:
             return f"{n:.1f} {unit}"
@@ -779,7 +770,6 @@ def _fmt_uptime(seconds: float) -> str:
 
 
 def _gpu_info_sync() -> str:
-    """Query nvidia-smi if available; returns formatted string or empty."""
     if not shutil.which("nvidia-smi"):
         return ""
     try:
@@ -820,7 +810,6 @@ def handle_system_stats(_data: dict) -> str:
 
     lines: list[str] = []
 
-
     boot_time  = datetime.fromtimestamp(psutil.boot_time())
     uptime_sec = time.time() - psutil.boot_time()
     lines.append(
@@ -830,7 +819,6 @@ def handle_system_stats(_data: dict) -> str:
         f"(booted {boot_time.strftime('%d %b %Y %H:%M')})"
     )
 
-   
     cpu_pct_overall = psutil.cpu_percent(interval=0.5)
     cpu_pct_per     = psutil.cpu_percent(interval=None, percpu=True)
     cpu_freq        = psutil.cpu_freq()
@@ -854,8 +842,7 @@ def handle_system_stats(_data: dict) -> str:
         + "\n".join(core_bar_parts)
     )
 
-
-    ram = psutil.virtual_memory()
+    ram  = psutil.virtual_memory()
     swap = psutil.swap_memory()
     ram_bar_len = int(ram.percent / 10)
     ram_bar     = "█" * ram_bar_len + "░" * (10 - ram_bar_len)
@@ -868,7 +855,6 @@ def handle_system_stats(_data: dict) -> str:
         f"  Swap : {_fmt_bytes(swap.used)} / {_fmt_bytes(swap.total)}"
         + (f"  ({swap.percent:.1f}%)" if swap.total else "  (no swap)")
     )
-
 
     disk_lines = ["**💾 Disk**"]
     try:
@@ -896,11 +882,9 @@ def handle_system_stats(_data: dict) -> str:
             disk_lines.append(f"  {part.mountpoint:<12} (permission denied)")
     lines.append("\n" + "\n".join(disk_lines))
 
-
     gpu_str = _gpu_info_sync()
     if gpu_str:
         lines.append(f"\n**🎮 GPU**\n{gpu_str}")
-
 
     try:
         net_before = psutil.net_io_counters(pernic=False)
@@ -916,14 +900,13 @@ def handle_system_stats(_data: dict) -> str:
             f"Recv {_fmt_bytes(net_after.bytes_recv)}",
         ]
 
-        # Active interfaces with IP
         addrs = psutil.net_if_addrs()
         stats = psutil.net_if_stats()
         active_ifaces = []
         for iface, stat in stats.items():
             if stat.isup and iface in addrs:
                 for addr in addrs[iface]:
-                    if addr.family.name in ("AF_INET", "2"):  # IPv4
+                    if addr.family.name in ("AF_INET", "2"):
                         active_ifaces.append(f"    {iface}: {addr.address}")
         if active_ifaces:
             net_lines.append("  Interfaces:")
@@ -932,7 +915,6 @@ def handle_system_stats(_data: dict) -> str:
         lines.append("\n" + "\n".join(net_lines))
     except Exception as exc:
         log.warning(f"Network stats error: {exc}")
-
 
     try:
         procs = []
@@ -943,7 +925,6 @@ def handle_system_stats(_data: dict) -> str:
             except (psutil.NoSuchProcess, psutil.AccessDenied):
                 pass
 
-        # Warm up CPU measurements
         psutil.cpu_percent(interval=0.2)
 
         top_cpu = sorted(procs, key=lambda x: x.get("cpu_percent") or 0, reverse=True)[:5]
@@ -976,17 +957,11 @@ def handle_system_stats(_data: dict) -> str:
 
 
 def _normalize_proc_name(name: str) -> list[str]:
-    """
-    Given a user-friendly name like "chrome", return a list of possible
-    process names to search for across Windows / macOS / Linux.
-    """
     name = name.strip().lower()
-    # Strip .exe suffix for matching
     base = name.removesuffix(".exe")
 
     candidates = {name, base}
 
-    # Common aliases
     _PROC_ALIASES: dict[str, list[str]] = {
         "chrome":        ["chrome", "chrome.exe", "google chrome", "googlechrome"],
         "firefox":       ["firefox", "firefox.exe"],
@@ -1033,14 +1008,9 @@ def _normalize_proc_name(name: str) -> list[str]:
 
 
 def _find_processes_by_name(name_or_pid: str) -> list:
-    """
-    Return a list of psutil.Process objects matching name_or_pid.
-    Accepts process name (fuzzy), exact exe name, or PID.
-    """
     if not PSUTIL_AVAILABLE:
         return []
 
-    # Try PID first
     try:
         pid = int(name_or_pid)
         p   = psutil.Process(pid)
@@ -1067,10 +1037,6 @@ def _find_processes_by_name(name_or_pid: str) -> list:
 
 
 def handle_close_app(data: dict) -> str:
-    """
-    Close a running application gracefully (SIGTERM), then forcefully (SIGKILL)
-    if it doesn't exit within 3 seconds. Works on Windows, macOS, Linux.
-    """
     if not PSUTIL_AVAILABLE:
         return (
             "❌ `psutil` is not installed — required for close_app.\n"
@@ -1084,9 +1050,7 @@ def handle_close_app(data: dict) -> str:
     procs = _find_processes_by_name(app_name)
 
     if not procs:
-        # Last resort on Windows: use taskkill
         if platform.system() == "Windows":
-            # Try taskkill with the raw name
             exe_name = app_name if app_name.endswith(".exe") else f"{app_name}.exe"
             r = subprocess.run(
                 ["taskkill", "/F", "/IM", exe_name],
@@ -1094,7 +1058,6 @@ def handle_close_app(data: dict) -> str:
             )
             if r.returncode == 0:
                 return f"✅ Closed **{app_name}** via taskkill."
-            # Also try without .exe
             r2 = subprocess.run(
                 ["taskkill", "/F", "/IM", app_name],
                 capture_output=True, text=True,
@@ -1105,7 +1068,7 @@ def handle_close_app(data: dict) -> str:
 
     killed  = []
     failed  = []
-    skipped = [] 
+    skipped = []
 
     PROTECTED = {
         "system", "smss.exe", "csrss.exe", "wininit.exe", "winlogon.exe",
@@ -1153,10 +1116,6 @@ def handle_close_app(data: dict) -> str:
 
 
 def _take_screenshot_sync() -> tuple[str, str]:
-    """
-    Take a full-screen screenshot.
-    Returns (base64_png_string, saved_file_path).
-    """
     Path(SCREENSHOT_FOLDER).mkdir(parents=True, exist_ok=True)
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
     save_path = os.path.join(SCREENSHOT_FOLDER, f"screen_{timestamp}.png")
@@ -1164,10 +1123,8 @@ def _take_screenshot_sync() -> tuple[str, str]:
     if PYAUTOGUI_AVAILABLE:
         screenshot = pyautogui.screenshot()
     else:
-        # Fallback: PIL ImageGrab (Windows/macOS only)
         screenshot = PIL.ImageGrab.grab()
 
-    # Downscale for vision model if very large (keeps tokens manageable)
     w, h = screenshot.size
     max_dim = 1280
     if w > max_dim or h > max_dim:
@@ -1194,11 +1151,6 @@ def _vision_plan_actions_sync(
     screen_h: int,
     previous_actions: list[dict] | None = None,
 ) -> list[dict]:
-    """
-    Send a screenshot to the vision model and ask it to plan a sequence
-    of UI actions to achieve `goal`.
-    Returns a list of action dicts.
-    """
     prev_str = ""
     if previous_actions:
         prev_str = (
@@ -1239,17 +1191,14 @@ Rules:
     raw = _ollama_vision_sync(image_b64, prompt, max_tokens=800)
     log.info(f"Vision plan (raw): {raw[:400]}")
 
-    # Extract JSON array
     raw_clean = re.sub(r"<think>[\s\S]*?</think>", "", raw, flags=re.IGNORECASE).strip()
     for text in [raw_clean, raw]:
-        # Try direct parse
         try:
             parsed = json.loads(text.strip())
             if isinstance(parsed, list):
                 return parsed
         except json.JSONDecodeError:
             pass
-        # Try extracting array
         m = re.search(r"\[[\s\S]*\]", text)
         if m:
             try:
@@ -1270,10 +1219,6 @@ def _execute_screen_actions_sync(
     goal: str,
     use_vision: bool = True,
 ) -> dict:
-    """
-    Execute a list of screen actions.
-    Returns a dict with keys: actions_taken, screenshots, final_message, error
-    """
     if not PYAUTOGUI_AVAILABLE:
         return {
             "actions_taken": [],
@@ -1374,7 +1319,7 @@ def _execute_screen_actions_sync(
 
             elif atype == "wait":
                 secs = float(action.get("seconds", 0.5))
-                secs = min(secs, 10.0)  # Cap at 10s for safety
+                secs = min(secs, 10.0)
                 time.sleep(secs)
                 result["actions_taken"].append({"type": "wait", "seconds": secs})
 
@@ -1384,7 +1329,6 @@ def _execute_screen_actions_sync(
                 result["actions_taken"].append({"type": "screenshot", "path": path})
                 log.info(f"Mid-action screenshot: {path}")
 
-                # If vision is available, re-evaluate after screenshot
                 if use_vision and i < len(actions) - 1:
                     remaining_goal = f"Continue: {goal}"
                     new_plan = _vision_plan_actions_sync(
@@ -1392,7 +1336,6 @@ def _execute_screen_actions_sync(
                         previous_actions=result["actions_taken"]
                     )
                     if new_plan:
-                        # Replace remaining actions with updated plan
                         actions = result["actions_taken"] + new_plan
                         log.info(f"Re-planned after screenshot: {len(new_plan)} new action(s)")
 
@@ -1419,14 +1362,6 @@ def _execute_screen_actions_sync(
 
 
 def handle_screen_action_sync(data: dict) -> str:
-    """
-    Full screen_action pipeline:
-    1. Take a screenshot
-    2. If no actions provided, use vision model to plan them
-    3. Execute the actions
-    4. Take a final screenshot for verification
-    5. Return a rich summary
-    """
     if not PYAUTOGUI_AVAILABLE:
         return (
             "❌ Screen automation libraries not installed.\n"
@@ -1442,17 +1377,14 @@ def handle_screen_action_sync(data: dict) -> str:
     if not goal and not preset_actions:
         return "❌ screen_action: provide a goal or action list."
 
-    # Get screen dimensions
     screen_w, screen_h = pyautogui.size()
     log.info(f"Screen resolution: {screen_w}x{screen_h}")
 
-    # 1. Take initial screenshot
     try:
         b64, initial_path = _take_screenshot_sync()
     except Exception as exc:
         return f"❌ Could not take screenshot: {exc}"
 
-    # 2. Plan actions via vision model if none provided
     actions = preset_actions
     if not actions and goal:
         log.info("No preset actions — planning via vision model...")
@@ -1466,19 +1398,16 @@ def handle_screen_action_sync(data: dict) -> str:
 
     log.info(f"Executing {len(actions)} screen action(s) for goal: {goal}")
 
-    # 3. Execute actions
     exec_result = _execute_screen_actions_sync(
         actions, screen_w, screen_h, goal, use_vision=(not preset_actions)
     )
 
-    # 4. Take final screenshot
     try:
         _, final_path = _take_screenshot_sync()
         exec_result["screenshots"].append(final_path)
     except Exception:
         pass
 
-    # 5. Build report
     parts = []
 
     if goal:
@@ -1534,14 +1463,14 @@ def handle_screen_action_sync(data: dict) -> str:
     return "\n".join(parts)
 
 
+
+
 _APP_ALIASES: dict[str, str] = {
-    # Browsers
     "chrome": "chrome", "google chrome": "chrome",
     "firefox": "firefox",
     "edge": "msedge", "microsoft edge": "msedge",
     "brave": "brave", "opera": "opera", "opera gx": "opera",
     "vivaldi": "vivaldi", "tor": "tor browser",
-    # Gaming / launchers
     "steam": "steam",
     "epic": "epicgameslauncher", "epic games": "epicgameslauncher",
     "epic games launcher": "epicgameslauncher",
@@ -1554,17 +1483,14 @@ _APP_ALIASES: dict[str, str] = {
     "league": "riotclientservices",
     "minecraft": "minecraftlauncher",
     "xbox": "xboxapp", "xbox app": "xboxapp",
-    # Media
     "spotify": "spotify", "vlc": "vlc", "mpv": "mpv", "plex": "plex",
     "obs": "obs64", "obs studio": "obs64",
     "audacity": "audacity", "winamp": "winamp",
     "foobar": "foobar2000", "foobar2000": "foobar2000",
-    # Communication
     "discord": "discord", "slack": "slack",
     "teams": "teams", "microsoft teams": "teams",
     "zoom": "zoom", "telegram": "telegram",
     "signal": "signal", "whatsapp": "whatsapp", "skype": "skype",
-    # Dev tools
     "vscode": "code", "visual studio code": "code",
     "vs code": "code", "code": "code",
     "visual studio": "devenv",
@@ -1581,7 +1507,6 @@ _APP_ALIASES: dict[str, str] = {
     "postman": "postman", "insomnia": "insomnia",
     "docker": "docker desktop", "docker desktop": "docker desktop",
     "dbeaver": "dbeaver", "tableplus": "tableplus",
-    # Productivity / Office
     "notepad": "notepad", "wordpad": "wordpad",
     "word": "winword", "excel": "excel",
     "powerpoint": "powerpnt", "outlook": "outlook",
@@ -1589,13 +1514,11 @@ _APP_ALIASES: dict[str, str] = {
     "libreoffice": "soffice", "libreoffice writer": "swriter",
     "libreoffice calc": "scalc",
     "notion": "notion", "obsidian": "obsidian", "todoist": "todoist",
-    # Creative
     "photoshop": "photoshop", "illustrator": "illustrator",
     "premiere": "premiere", "after effects": "afterfx",
     "lightroom": "lightroom", "gimp": "gimp",
     "inkscape": "inkscape", "blender": "blender",
     "figma": "figma", "davinci": "resolve", "davinci resolve": "resolve",
-    # System
     "task manager": "taskmgr", "file explorer": "explorer",
     "explorer": "explorer", "calculator": "calc",
     "paint": "mspaint", "snipping tool": "snippingtool",
@@ -1801,7 +1724,7 @@ def _find_app_linux(canonical: str, original: str) -> str | None:
 
 def _platform_launch(target: str, system: str) -> None:
     if system == "Windows":
-        os.startfile(target)              # type: ignore[attr-defined]
+        os.startfile(target)
     elif system == "Darwin":
         subprocess.Popen(["open", target])
     else:
@@ -1839,7 +1762,7 @@ def handle_open_app(data: dict) -> str:
             except Exception as exc:
                 return f"❌ Found `{exe}` but couldn't launch it: {exc}"
         try:
-            os.startfile(canonical)       # type: ignore[attr-defined]
+            os.startfile(canonical)
             return f"✅ Launched **{app_raw}**."
         except Exception:
             pass
@@ -1878,6 +1801,7 @@ def handle_open_app(data: dict) -> str:
         f"❌ Couldn't find **{app_raw}** on your system.\n"
         f"💡 Try telling me the full path and I'll open it directly."
     )
+
 
 def handle_vscode_open(data: dict) -> str:
     target = (
@@ -1942,6 +1866,112 @@ def handle_chat(data: dict) -> str:
     return data.get("reply") or "I'm not sure how to respond to that."
 
 
+
+
+async def handle_shutdown_bot(data: dict) -> str:
+    """
+    Gracefully shut down the ZENTRA bot process.
+    Persists memory and seen emails, stops the scheduler,
+    sends the farewell reply, then exits after a short delay
+    so the Discord message has time to actually send.
+    """
+    reply = data.get("reply", "").strip() or "Shutting down ZENTRA. Goodbye! 👋"
+
+    # Persist state before exit
+    persist_memory()
+    _persist_seen_emails()
+
+    if scheduler:
+        scheduler.stop()
+
+    log.info("Shutdown requested by user — exiting in 1.5 s.")
+
+    # Delay exit slightly so the reply message can be dispatched first
+    asyncio.get_event_loop().call_later(1.5, lambda: os._exit(0))
+
+    return reply
+
+
+def handle_shutdown_pc(data: dict) -> str:
+    """
+    Shut down, restart, sleep, or cancel a pending shutdown on the host PC.
+    The mode is read from data['app']: shutdown | restart | sleep | cancel
+    """
+    mode   = (data.get("app") or "shutdown").strip().lower()
+    system = platform.system()
+
+    if system == "Windows":
+        cmds = {
+            "shutdown": ["shutdown", "/s", "/t", "10", "/c", "ZENTRA: Shutting down..."],
+            "restart":  ["shutdown", "/r", "/t", "10", "/c", "ZENTRA: Restarting..."],
+            "sleep":    ["rundll32.exe", "powrprof.dll,SetSuspendState", "0", "1", "0"],
+            "cancel":   ["shutdown", "/a"],
+        }
+    elif system == "Darwin":
+        cmds = {
+            "shutdown": ["sudo", "shutdown", "-h", "+1"],
+            "restart":  ["sudo", "shutdown", "-r", "+1"],
+            "sleep":    ["pmset", "sleepnow"],
+            "cancel":   ["sudo", "killall", "shutdown"],
+        }
+    else:  # Linux
+        cmds = {
+            "shutdown": ["shutdown", "-h", "+1"],
+            "restart":  ["shutdown", "-r", "+1"],
+            "sleep":    ["systemctl", "suspend"],
+            "cancel":   ["shutdown", "-c"],
+        }
+
+    if mode not in cmds:
+        return (
+            f"❌ Unknown mode `{mode}`.\n"
+            f"Use one of: `shutdown`, `restart`, `sleep`, or `cancel`."
+        )
+
+    cmd = cmds[mode]
+    icons = {
+        "shutdown": "🔴",
+        "restart":  "🔄",
+        "sleep":    "💤",
+        "cancel":   "✅",
+    }
+
+    log.info(f"shutdown_pc: mode={mode} system={system} cmd={cmd}")
+
+    try:
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=10)
+
+        if result.returncode != 0:
+            err = (result.stderr or result.stdout).strip()
+            # Sleep on Windows always returns non-zero but still works
+            if mode != "sleep":
+                return f"❌ Command failed (exit {result.returncode}):\n```\n{err}\n```"
+
+        if mode == "cancel":
+            return f"{icons[mode]} Scheduled shutdown/restart cancelled successfully."
+
+        if mode == "sleep":
+            return f"{icons[mode]} Putting your PC to sleep now..."
+
+        delay_note = " in ~1 minute" if system != "Windows" else " in 10 seconds"
+        return (
+            f"{icons[mode]} Your PC will **{mode}**{delay_note}.\n"
+            f"Say **'cancel shutdown'** to abort."
+        )
+
+    except FileNotFoundError:
+        return (
+            f"❌ Shutdown command not found.\n"
+            f"On Linux/macOS you may need elevated permissions (sudo)."
+        )
+    except subprocess.TimeoutExpired:
+        return "❌ Shutdown command timed out — the system may still respond."
+    except Exception as exc:
+        log.error(f"shutdown_pc error: {exc}", exc_info=True)
+        return f"❌ Unexpected error during shutdown: {exc}"
+
+
+
 def _get_google_credentials():
     if not GOOGLE_AVAILABLE:
         raise RuntimeError(
@@ -1989,7 +2019,6 @@ def _get_header(headers: list, name: str) -> str:
 
 
 def _clean_sender(raw: str) -> str:
-    """Extract 'Name' from 'Name <email@domain.com>' or return the raw address."""
     m = re.match(r'^"?([^"<]+?)"?\s*<[^>]+>$', raw.strip())
     if m:
         return m.group(1).strip()
@@ -2004,7 +2033,6 @@ def _decode_email_body(msg: dict) -> str:
             if data:
                 return base64.urlsafe_b64decode(data + "==").decode("utf-8", errors="replace")
         if mime == "text/html" and not part.get("parts"):
-            # Fallback: strip HTML tags for plain text
             data = part.get("body", {}).get("data", "")
             if data:
                 html = base64.urlsafe_b64decode(data + "==").decode("utf-8", errors="replace")
@@ -2020,7 +2048,6 @@ def _decode_email_body(msg: dict) -> str:
 
 
 def _gmail_api_call_with_backoff(fn, max_retries: int = 3):
-    """Execute a Google API call with exponential backoff on rate-limit errors."""
     for attempt in range(max_retries):
         try:
             return fn()
@@ -2085,27 +2112,17 @@ def _fetch_unread_emails_sync(since_hours: int = 24, query_extra: str = "") -> l
 
 
 def _importance_score(sender: str, subject: str, snippet: str) -> int:
-    """
-    Returns an integer 0–3:
-      0 = not important
-      1 = mildly important (keyword match)
-      2 = important (sender list or strong keyword)
-      3 = critical (AI confirmed + keyword)
-    """
     combined = f"{sender} {subject} {snippet}".lower()
     score = 0
 
-
     if any(s.lower() in combined for s in IMPORTANT_SENDERS):
         score += 2
-
 
     keyword_hits = sum(1 for kw in IMPORTANT_KEYWORDS if kw in combined)
     if keyword_hits >= 2:
         score += 2
     elif keyword_hits == 1:
         score += 1
-
 
     if score == 1:
         answer = _ollama_raw_sync(
@@ -2123,7 +2140,6 @@ def _importance_score(sender: str, subject: str, snippet: str) -> int:
 def _format_email_digest(emails: list[dict]) -> str:
     if not emails:
         return "📭 No unread emails in the last 24 hours."
-
 
     def email_sort_key(e):
         return _importance_score(e["sender"], e["subject"], e["snippet"])
@@ -2159,18 +2175,11 @@ def _format_email_digest(emails: list[dict]) -> str:
 
 
 def _fetch_email_search_sync(query: str, max_results: int = 10) -> list[dict]:
-    """Search emails with a natural language query converted to Gmail search syntax."""
-    
-    gmail_q = query
-    if "from:" not in query.lower() and "subject:" not in query.lower():
-  
-        gmail_q = query
-
     try:
         service = _gmail_service()
         results = _gmail_api_call_with_backoff(
             lambda: service.users().messages().list(
-                userId="me", q=gmail_q, maxResults=max_results
+                userId="me", q=query, maxResults=max_results
             ).execute()
         )
         emails = []
@@ -2199,7 +2208,6 @@ def _fetch_email_search_sync(query: str, max_results: int = 10) -> list[dict]:
 
 
 def _parse_send_request_sync(user_text: str) -> dict | None:
-    """Use AI to extract recipient, subject, and body from natural language."""
     raw = _ollama_raw_sync(
         "Extract email send details from the user's request. "
         "Reply ONLY with raw JSON, no markdown:\n"
@@ -2271,6 +2279,9 @@ async def handle_gmail_send(data: dict) -> str:
     return await asyncio.to_thread(_send_email_sync, to, subject, body)
 
 
+
+
+
 def _fmt_event_time(iso_str: str) -> str:
     try:
         dt = datetime.fromisoformat(iso_str.replace("Z", "+00:00"))
@@ -2293,13 +2304,10 @@ def _fmt_event_duration(start: str, end: str) -> str:
 
 
 def _extract_meeting_link(event: dict) -> str:
-    """Pull Zoom / Meet / Teams link from description or conferenceData."""
-    # Google Meet
     conf = event.get("conferenceData", {})
     for ep in conf.get("entryPoints", []):
         if ep.get("entryPointType") == "video":
             return ep.get("uri", "")
-    # Fallback: scan description
     desc = event.get("description", "") or ""
     m = re.search(
         r"https?://(?:meet\.google\.com|zoom\.us|teams\.microsoft\.com)/\S+",
@@ -2309,7 +2317,6 @@ def _extract_meeting_link(event: dict) -> str:
 
 
 def _detect_conflicts(events: list[dict]) -> list[str]:
-    """Return list of conflict description strings."""
     conflicts = []
     timed = []
     for ev in events:
@@ -2369,9 +2376,8 @@ def _fetch_events_sync(days_ahead: int = 1) -> list[dict]:
 
 
 def _render_event_card(ev: dict, show_date: bool = False) -> str:
-    """Render a rich single-event card string."""
     start_str = ev.get("start", "")
-    end_str   = ev.get("end", "")
+    end_str   = ev.get("end",   "")
 
     if ev.get("all_day"):
         time_str = "All day"
@@ -2551,10 +2557,8 @@ def _search_events_sync(keyword: str, days_range: int = 30) -> list[dict]:
 
 
 def _delete_event_sync(query_text: str) -> str:
-    """Find and delete an event matching the query (title + optional time)."""
     try:
         service = _calendar_service()
-        # Extract a keyword for the search
         keyword = _ollama_raw_sync(
             "Extract just the event title keywords (2-4 words max) from this deletion request. "
             "Reply with ONLY the keywords, nothing else.",
@@ -2575,7 +2579,6 @@ def _delete_event_sync(query_text: str) -> str:
             log.info(f"Deleted event: {ev['summary']}")
             return f"🗑️ Deleted **{ev['summary']}** ({start_str})"
 
-        # Multiple matches — show list and ask user to be specific
         lines = [f"Found {len(events)} matching events — which one did you mean?\n"]
         for i, ev in enumerate(events[:5], 1):
             time_str = _fmt_event_time(ev["start"]) if ev.get("start") and "T" in ev["start"] else ev.get("start", "")[:10]
@@ -2586,8 +2589,6 @@ def _delete_event_sync(query_text: str) -> str:
     except Exception as exc:
         log.error(f"Calendar delete error: {exc}")
         return f"❌ Could not delete event: {exc}"
-
-
 
 
 async def handle_calendar_today(data: dict) -> str:
@@ -2656,6 +2657,8 @@ def _google_not_available() -> str:
     )
 
 
+
+
 class ZentraScheduler:
     def __init__(self, discord_client):
         self.client         = discord_client
@@ -2693,7 +2696,6 @@ class ZentraScheduler:
             target += timedelta(days=1)
         await asyncio.sleep((target - now).total_seconds())
 
-
     async def _morning_digest_loop(self):
         while True:
             await self._wait_until(MORNING_DIGEST_HOUR, MORNING_DIGEST_MINUTE)
@@ -2715,7 +2717,6 @@ class ZentraScheduler:
         cal_msg      = _format_calendar_briefing(today_events, "Today")
 
         await self._dm(header + email_msg + "\n\n──────────────\n\n" + cal_msg)
-
 
     async def _email_poll_loop(self):
         await asyncio.sleep(30)
@@ -2748,7 +2749,6 @@ class ZentraScheduler:
             except Exception as exc:
                 log.error(f"Email poll error: {exc}")
             await asyncio.sleep(EMAIL_POLL_INTERVAL_MINUTES * 60)
-
 
     async def _event_reminder_loop(self):
         await asyncio.sleep(60)
@@ -2784,6 +2784,8 @@ class ZentraScheduler:
             except Exception as exc:
                 log.error(f"Event reminder error: {exc}")
             await asyncio.sleep(60)
+
+
 
 
 async def dispatch_action(data: dict) -> tuple[str, str]:
@@ -2834,6 +2836,10 @@ async def dispatch_action(data: dict) -> tuple[str, str]:
         result = combine(await handle_calendar_delete(data))
     elif action == "calendar_search":
         result = combine(await handle_calendar_search(data))
+    elif action == "shutdown_bot":
+        result = combine(await handle_shutdown_bot(data))
+    elif action == "shutdown_pc":
+        result = combine(handle_shutdown_pc(data))
     elif action == "chat":
         result = handle_chat(data)
     else:
@@ -2841,6 +2847,7 @@ async def dispatch_action(data: dict) -> tuple[str, str]:
         result = reply or f"⚠️ Unknown action `{action}`."
 
     return result, file_content
+
 
 
 async def keep_typing(channel: discord.DMChannel, stop_event: asyncio.Event) -> None:
@@ -2878,7 +2885,6 @@ async def process_message(user_id: int, user_input: str) -> str:
         log.error(f"Dispatch error: {exc}", exc_info=True)
         return f"⚠️ Action failed: {exc}"
 
-
     if file_content:
         filename = parsed.get("filename", "file")
         followup_prompt = (
@@ -2915,7 +2921,7 @@ scheduler: ZentraScheduler | None = None
 async def on_ready() -> None:
     global scheduler
     log.info("=" * 60)
-    log.info("  ZENTRA v7.0 — AI Developer Assistant")
+    log.info("  ZENTRA v7.1 — AI Developer Assistant")
     log.info(f"  Bot user    : {client.user} (ID {client.user.id})")
     log.info(f"  Ollama      : {OLLAMA_ENDPOINT}  model={OLLAMA_MODEL}")
     log.info(f"  Vision model: {OLLAMA_VISION_MODEL}")
@@ -2930,7 +2936,9 @@ async def on_ready() -> None:
     log.info(f"                screen_action,")
     log.info(f"                gmail_summary, gmail_send,")
     log.info(f"                calendar_today, calendar_week,")
-    log.info(f"                calendar_add, calendar_delete, calendar_search, chat")
+    log.info(f"                calendar_add, calendar_delete, calendar_search,")
+    log.info(f"                shutdown_bot, shutdown_pc,")
+    log.info(f"                chat")
     log.info(f"  psutil      : {'✅ available' if PSUTIL_AVAILABLE else '❌ not installed (pip install psutil)'}")
     log.info(f"  pyautogui   : {'✅ available' if PYAUTOGUI_AVAILABLE else '❌ not installed (pip install pyautogui pillow)'}")
     log.info(f"  Google APIs : {'✅ available' if GOOGLE_AVAILABLE else '❌ not installed'}")
@@ -2989,13 +2997,15 @@ async def on_message(message: discord.Message) -> None:
     log.info(f"DM → {message.author}: {response[:120]}…")
 
 
+
+
 if __name__ == "__main__":
-    if DISCORD_BOT_TOKEN == "########################################################":
+    if DISCORD_BOT_TOKEN == "YOUR_BOT_TOKEN_HERE":
         print("=" * 60)
         print("  ❌  No Discord bot token found!")
         print()
-        print("  Open zentra_bot.py and replace the placeholder on")
-        print("  the DISCORD_BOT_TOKEN line with your real token from:")
+        print("  Open zentra_bot.py and replace YOUR_BOT_TOKEN_HERE")
+        print("  with your real token from:")
         print("  https://discord.com/developers/applications")
         print("=" * 60)
         raise SystemExit(1)
@@ -3014,5 +3024,5 @@ if __name__ == "__main__":
         print("    To enable: pip install google-auth google-auth-oauthlib")
         print("               google-auth-httplib2 google-api-python-client")
 
-    log.info("Starting ZENTRA v7.0…")
+    log.info("Starting ZENTRA v7.1…")
     client.run(DISCORD_BOT_TOKEN)
