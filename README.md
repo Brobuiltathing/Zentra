@@ -27,7 +27,7 @@ Supports both **Ollama (local models)** and **API-based models** (Claude and Ope
 To download the Ollama Discord Git:
 
 ```bash 
-git clone https://github.com/Brobuiltathing/ZentraAI.git
+git clone https://github.com/Brobuiltathing/Zentra.git
 ```
 
 ### Pip Installations
