@@ -1,6 +1,6 @@
-# ZentraAI
+# Zentra
 
-ZentraAI is a modular AI assistant that integrates with Gmail, Google Calendar, weather APIs, and your local system.  
+Zentra is a modular assistant that integrates with Gmail, Google Calendar, weather APIs, and your local system.  
 It can create files, modify content, manage directory structures, control applications, read system information, and act as a fully capable personal assistant.  
 You can run it locally with a GUI or remotely through Discord.  
 Supports both **Ollama (local models)** and **API-based models** (Claude and OpenAI).
